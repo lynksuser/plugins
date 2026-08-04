@@ -1,0 +1,13 @@
+{
+  "name": "Hide Group DMs",
+  "description": "Hide selected group DMs from your channel list.",
+  "authors": [
+    {
+      "name": "lynksuser"
+    }
+  ],
+  "main": "src/index.ts",
+  "vendetta": {
+    "icon": "ic_image_slash"
+  }
+}
