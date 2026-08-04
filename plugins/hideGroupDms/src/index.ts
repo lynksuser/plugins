@@ -10,6 +10,7 @@ import {
     noteCall,
     noteResult,
     originals,
+    patchedStores,
     refreshChannelList,
     rowDiag,
 } from "./hidden";
@@ -45,6 +46,7 @@ function tryPatch(label: string, mod: any, fnName: string) {
     if (typeof mod?.[fnName] !== "function") return;
     if (isPatched(mod, fnName)) return;
     patchedPairs.push([mod, fnName]);
+    if (typeof mod.emitChange === "function") patchedStores.push(mod);
 
     // Keep an unpatched handle for the settings page.
     originals[label] = mod[fnName].bind(mod);
@@ -62,6 +64,12 @@ function tryPatch(label: string, mod: any, fnName: string) {
 
 export default {
     onLoad() {
+        // MUST run before any patching. Once a getter is patched it returns a
+        // filtered list, so it can no longer be seen to contain a hidden id —
+        // the scan would be blind to exactly the surfaces we most care about.
+        const sources = findListSources(hiddenIds());
+        diag.sources = sources.map((s) => `${s.store}.${s.fn} (${s.hits})`);
+
         // Known candidates first, so their labels stay stable and readable.
         tryPatch(
             "PrivateChannelSortStore.getPrivateChannelIds",
@@ -99,22 +107,20 @@ export default {
         // The home drawer row, kept in case the experiment is enabled on some builds.
         patches.push(...patchDMRow());
 
-        // Behavioural search: whatever store getter currently returns a list
-        // containing a hidden id is, by definition, holding the channel we want
-        // gone. Patch those regardless of what they're named.
-        const sources = findListSources(hiddenIds());
-        diag.sources = sources.map((s) => `${s.store}.${s.fn} (${s.hits})`);
-
+        // Patch whatever the pre-patch scan found holding a hidden id, regardless
+        // of what it's named.
         for (const { store: storeName, fn } of sources) {
             tryPatch(`${storeName}.${fn}`, findByStoreName(storeName), fn);
         }
 
         if (!patches.length) {
             logger.warn("[HideGroupDMs] Nothing was patched.");
-            return;
+        } else {
+            logger.log(`[HideGroupDMs] Patched: ${diag.patched.join(", ")}`);
         }
 
-        logger.log(`[HideGroupDMs] Patched: ${diag.patched.join(", ")}`);
+        // Runs either way: patchDMRow may have attached without adding to `patches`
+        // on some builds, and an early return here would skip the refresh entirely.
         refreshChannelList();
     },
 
@@ -122,10 +128,12 @@ export default {
         patches.forEach((unpatch) => unpatch?.());
         patches = [];
         patchedPairs = [];
+        patchedStores.length = 0;
         diag.patched = [];
         diag.calls = {};
         diag.removed = {};
         diag.sample = {};
+        diag.sources = [];
         rowDiag.status = "not attempted";
         rowDiag.moduleId = "";
         rowDiag.calls = 0;

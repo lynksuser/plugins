@@ -41,17 +41,10 @@ function getGroupDMs(): any[] {
 function Diagnostics() {
     const patched = diag.patched;
 
-    if (!patched.length) {
-        return (
-            <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                Nothing was patched. None of the candidate modules exist on this client,
-                so hiding cannot work yet.
-            </FormText>
-        );
-    }
-
     return (
         <>
+            {/* These two must render even when nothing was patched — they are how
+                we diagnose the nothing-was-patched case in the first place. */}
             <FormRow
                 label="Hidden ids in storage"
                 subLabel={hiddenIds().join(", ") || "none"}
@@ -62,6 +55,11 @@ function Diagnostics() {
                 subLabel={diag.sources.join("\n") || "none found at load"}
             />
             <FormDivider />
+            {patched.length === 0 && (
+                <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                    Nothing was patched on this client.
+                </FormText>
+            )}
             {patched.map((label, i) => {
                 const calls = diag.calls[label] ?? 0;
                 const removed = diag.removed[label] ?? 0;

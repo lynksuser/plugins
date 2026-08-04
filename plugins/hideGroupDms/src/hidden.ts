@@ -6,12 +6,14 @@ export const SORT_STORES = ["PrivateChannelSortStore", "SortedPrivateChannelStor
 
 storage.hidden ??= {};
 
-export const isHidden = (id: string): boolean => !!storage.hidden[id];
+// Optional-chained: this runs inside patched getters, which can fire before the
+// storage proxy has resolved. An exception here would break the store, not just us.
+export const isHidden = (id: string): boolean => !!storage.hidden?.[id];
 
 export function setHidden(id: string, hidden: boolean) {
     // Reassign the whole object rather than mutating a key, so the storage
     // proxy definitely sees a top-level write and persists it.
-    const next = { ...storage.hidden };
+    const next = { ...(storage.hidden ?? {}) };
     if (hidden) next[id] = true;
     else delete next[id];
     storage.hidden = next;
@@ -73,14 +75,32 @@ export const rowDiag = {
 // channels without seeing its own filter applied.
 export const originals: Record<string, ((...args: any[]) => any) | undefined> = {};
 
+// Stores we've actually patched. index.ts fills this; refreshChannelList needs it
+// because emitting only on SORT_STORES leaves any dynamically-found store stale.
+export const patchedStores: any[] = [];
+
 // Patching the store changes what it returns, but nothing has told the DM list
 // to ask again. Emitting a change makes subscribed components re-render.
 export function refreshChannelList() {
-    for (const name of SORT_STORES) {
+    const targets = [
+        ...SORT_STORES.map((name) => {
+            try {
+                return findByStoreName(name);
+            } catch {
+                return null;
+            }
+        }),
+        ...patchedStores,
+    ];
+
+    const seen = new Set<any>();
+    for (const store of targets) {
+        if (!store || seen.has(store)) continue;
+        seen.add(store);
         try {
-            findByStoreName(name)?.emitChange?.();
+            store.emitChange?.();
         } catch {
-            // store missing on this client version — nothing to refresh
+            // store dislikes being poked — nothing to refresh
         }
     }
 }

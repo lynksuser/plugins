@@ -39,17 +39,22 @@ export function pathsUnder(prefix: string): Array<{ id: string; path: string }> 
 
 /**
  * Resolves a module by source path rather than by id. Ids shift between Discord
- * builds; paths don't. Only returns already-initialised modules, so this never
- * forces a require.
+ * builds; paths don't.
+ *
+ * Requires isInitialized: an uninitialised module still has a truthy
+ * publicModule.exports (an empty object), so without this check we'd happily
+ * return a module with no exports and report its default as "not callable".
  */
 export function findByPath(re: RegExp): { id: string; exports: any } | null {
     const mods = moduleList();
 
     for (const id in mods) {
-        const path = mods[id]?.__filePath;
+        const record = mods[id];
+        const path = record?.__filePath;
         if (typeof path !== "string" || !re.test(path)) continue;
+        if (!record.isInitialized || record.hasError) continue;
 
-        const exports = mods[id]?.publicModule?.exports;
+        const exports = record.publicModule?.exports;
         if (exports) return { id, exports };
     }
 
