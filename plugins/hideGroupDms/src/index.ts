@@ -2,7 +2,7 @@ import { logger } from "@vendetta";
 import { findByProps, findByStoreName } from "@vendetta/metro";
 import { after } from "@vendetta/patcher";
 
-import Settings from "./settings";
+import Settings from "./Settings";
 import { diag, isHidden, noteCall, originals, refreshChannelList } from "./hidden";
 
 let patches: (() => void)[] = [];

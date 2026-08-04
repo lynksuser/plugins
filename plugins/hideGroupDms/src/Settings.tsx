@@ -5,6 +5,11 @@ import { useProxy } from "@vendetta/storage";
 import { Forms } from "@vendetta/ui/components";
 
 import { diag, isHidden, originals, setHidden } from "./hidden";
+import {
+    channelStoreNames,
+    listFunctions,
+    privateChannelModules,
+} from "./debug";
 
 const { FormSection, FormSwitchRow, FormText, FormDivider, FormRow } = Forms;
 
@@ -71,6 +76,45 @@ function Diagnostics() {
     );
 }
 
+// Reports what this client actually exposes, so we can stop guessing at names.
+function Discovery() {
+    const report = React.useMemo(() => {
+        const stores = channelStoreNames();
+        return {
+            stores: stores.map((name) => ({
+                name,
+                fns: listFunctions(findByStoreName(name)),
+            })),
+            modules: privateChannelModules(),
+        };
+    }, []);
+
+    return (
+        <>
+            <FormRow
+                label="Modules exposing a private-channel list"
+                subLabel={report.modules.join(", ") || "none found"}
+            />
+            <FormDivider />
+            {report.stores.length === 0 ? (
+                <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                    No channel-ish stores found via the dispatcher.
+                </FormText>
+            ) : (
+                report.stores.map((s, i) => (
+                    <React.Fragment key={s.name}>
+                        <FormRow
+                            label={s.name}
+                            subLabel={s.fns.join(", ") || "no list-shaped functions"}
+                        />
+                        {i < report.stores.length - 1 && <FormDivider />}
+                    </React.Fragment>
+                ))
+            )}
+        </>
+    );
+}
+
 export default function Settings() {
     useProxy(storage);
 
@@ -100,6 +144,10 @@ export default function Settings() {
 
             <FormSection title="Diagnostics">
                 <Diagnostics />
+            </FormSection>
+
+            <FormSection title="Discovery">
+                <Discovery />
             </FormSection>
         </RN.ScrollView>
     );
