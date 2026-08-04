@@ -4,12 +4,8 @@ import { storage } from "@vendetta/plugin";
 import { useProxy } from "@vendetta/storage";
 import { Forms } from "@vendetta/ui/components";
 
-import { diag, hiddenIds, isHidden, originals, rowDiag, setHidden } from "./hidden";
-import {
-    channelStoreNames,
-    listFunctions,
-    privateChannelModules,
-} from "./debug";
+import { diag, hiddenIds, isHidden, originals, setHidden } from "./hidden";
+import { filePathStats, matchingPaths } from "./debug";
 
 const { FormSection, FormSwitchRow, FormText, FormDivider, FormRow } = Forms;
 
@@ -86,66 +82,32 @@ function Diagnostics() {
     );
 }
 
-// Whether DM list rows pass through RowManager at all. If `shapes` only ever
-// shows message-shaped rows, the DM list is drawn somewhere else entirely.
-function Rows() {
-    return (
-        <>
-            <FormRow label="RowManager" subLabel={rowDiag.status} />
-            <FormDivider />
-            <FormRow
-                label="Rows generated / matched a hidden id"
-                subLabel={`${rowDiag.calls} generated, ${rowDiag.matched} matched`}
-            />
-            <FormDivider />
-            {rowDiag.shapes.length === 0 ? (
-                <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                    No rows seen yet. Open a DM list and a chat, then come back.
-                </FormText>
-            ) : (
-                rowDiag.shapes.map((sig, i) => (
-                    <React.Fragment key={sig}>
-                        <FormRow label={`shape ${i + 1}`} subLabel={sig} />
-                        {i < rowDiag.shapes.length - 1 && <FormDivider />}
-                    </React.Fragment>
-                ))
-            )}
-        </>
+// Searches the source paths Kettu records for every module Discord imports.
+// These are Discord's own file names, so a match tells us where the DM list
+// actually lives instead of us guessing at prop names.
+function Paths() {
+    const report = React.useMemo(
+        () => ({ stats: filePathStats(), matches: matchingPaths() }),
+        []
     );
-}
-
-// Reports what this client actually exposes, so we can stop guessing at names.
-function Discovery() {
-    const report = React.useMemo(() => {
-        const stores = channelStoreNames();
-        return {
-            stores: stores.map((name) => ({
-                name,
-                fns: listFunctions(findByStoreName(name)),
-            })),
-            modules: privateChannelModules(),
-        };
-    }, []);
 
     return (
         <>
             <FormRow
-                label="Modules exposing a private-channel list"
-                subLabel={report.modules.join(", ") || "none found"}
+                label="Modules scanned"
+                subLabel={`${report.stats.total} total, ${report.stats.withPath} with a source path`}
             />
             <FormDivider />
-            {report.stores.length === 0 ? (
+            {report.matches.length === 0 ? (
                 <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                    No channel-ish stores found via the dispatcher.
+                    No DM-related paths recorded yet. Open the DMs tab, then reopen this
+                    page — paths only appear once Discord imports the module.
                 </FormText>
             ) : (
-                report.stores.map((s, i) => (
-                    <React.Fragment key={s.name}>
-                        <FormRow
-                            label={s.name}
-                            subLabel={s.fns.join(", ") || "no list-shaped functions"}
-                        />
-                        {i < report.stores.length - 1 && <FormDivider />}
+                report.matches.map((m, i) => (
+                    <React.Fragment key={m.id}>
+                        <FormRow label={m.path} subLabel={`module ${m.id}`} />
+                        {i < report.matches.length - 1 && <FormDivider />}
                     </React.Fragment>
                 ))
             )}
@@ -184,12 +146,8 @@ export default function Settings() {
                 <Diagnostics />
             </FormSection>
 
-            <FormSection title="Row rendering">
-                <Rows />
-            </FormSection>
-
-            <FormSection title="Discovery">
-                <Discovery />
+            <FormSection title="Module paths">
+                <Paths />
             </FormSection>
         </RN.ScrollView>
     );

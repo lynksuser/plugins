@@ -1,9 +1,44 @@
-import { findAll } from "@vendetta/metro";
+import * as metro from "@vendetta/metro";
 import { FluxDispatcher } from "@vendetta/metro/common";
 
-// Asking the dispatcher which stores handle an action is the only reliable way
-// to learn real store names on a given client build. Borrowed from the
-// _computeOrderedActionHandlers trick in revengeplugin/customVoiceMessages.
+// Kettu records the source path of every module Discord imports, via its
+// fileFinishedImporting hook (see kettu/src/metro/internals/modules.ts). Those
+// paths are Discord's own file names, so searching them beats guessing at props.
+// Reading __filePath does NOT initialise the module, so this is cheap.
+const PATH_RE = /private.?channel|direct.?message|\bdms?\b|channel.?list|recipient/i;
+
+function moduleList(): Record<string, any> {
+    return (metro as any).modules ?? (globalThis as any).modules ?? {};
+}
+
+export function filePathStats(): { total: number; withPath: number } {
+    const mods = moduleList();
+    let total = 0;
+    let withPath = 0;
+
+    for (const id in mods) {
+        total++;
+        if (typeof mods[id]?.__filePath === "string") withPath++;
+    }
+
+    return { total, withPath };
+}
+
+/** Modules whose Discord source path looks DM-list related. */
+export function matchingPaths(): Array<{ id: string; path: string }> {
+    const mods = moduleList();
+    const out: Array<{ id: string; path: string }> = [];
+
+    for (const id in mods) {
+        const path = mods[id]?.__filePath;
+        if (typeof path === "string" && PATH_RE.test(path)) out.push({ id, path });
+    }
+
+    return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+// --- store helpers, kept from the earlier rounds -------------------------------
+
 const PROBE_ACTIONS = [
     "CONNECTION_OPEN",
     "CHANNEL_SELECT",
@@ -11,7 +46,6 @@ const PROBE_ACTIONS = [
     "CHANNEL_DELETE",
 ];
 
-/** Every Flux store name this client actually has. */
 export function storeNames(): string[] {
     const names = new Set<string>();
 
@@ -30,52 +64,39 @@ export function storeNames(): string[] {
     return [...names].sort();
 }
 
-/** Store names that plausibly own the DM list. */
 export function channelStoreNames(): string[] {
     return storeNames().filter((n) => /private|channel|dm/i.test(n));
 }
 
-/** List-shaped function names on a module. */
+/**
+ * List-shaped function names on a module.
+ *
+ * Walks the prototype chain with getOwnPropertyNames: Flux store methods are
+ * non-enumerable class-prototype members, so `for...in` misses all of them and
+ * every store wrongly looks empty.
+ */
 export function listFunctions(mod: any): string[] {
     if (!mod) return [];
 
-    const out: string[] = [];
-    for (const key in mod) {
-        try {
-            if (
-                typeof mod[key] === "function" &&
-                /private|sorted|channelid/i.test(key)
-            ) {
-                out.push(key);
+    const out = new Set<string>();
+    let obj: any = mod;
+
+    while (obj && obj !== Object.prototype) {
+        for (const key of Object.getOwnPropertyNames(obj)) {
+            if (key === "constructor") continue;
+            try {
+                if (
+                    typeof mod[key] === "function" &&
+                    /private|sorted|channelid/i.test(key)
+                ) {
+                    out.add(key);
+                }
+            } catch {
+                // getter threw — ignore this key
             }
-        } catch {
-            // getter threw — ignore this key
         }
+        obj = Object.getPrototypeOf(obj);
     }
 
-    return out.sort();
-}
-
-/** Any module exposing a private-channel-ish function, whatever its name. */
-export function privateChannelModules(): string[] {
-    try {
-        const mods = findAll((m: any) => {
-            if (!m || typeof m !== "object") return false;
-            return (
-                typeof m.getPrivateChannelIds === "function" ||
-                typeof m.getSortedPrivateChannels === "function" ||
-                typeof m.useSortedPrivateChannels === "function"
-            );
-        });
-
-        return mods.map(
-            (m: any) =>
-                m?.getName?.() ??
-                m?.constructor?.displayName ??
-                m?.displayName ??
-                "(anonymous)"
-        );
-    } catch {
-        return [];
-    }
+    return [...out].sort();
 }
