@@ -1,1 +1,1 @@
-# kettu/vendetta plugins for the weak and weary
+### kettu/vendetta plugins for the weak and weary
