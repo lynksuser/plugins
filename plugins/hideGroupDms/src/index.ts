@@ -5,6 +5,7 @@ import { after } from "@vendetta/patcher";
 import Settings from "./Settings";
 import {
     diag,
+    hiddenIds,
     isHidden,
     noteCall,
     noteResult,
@@ -12,7 +13,7 @@ import {
     refreshChannelList,
     rowDiag,
 } from "./hidden";
-import { channelStoreNames, listFunctions } from "./debug";
+import { channelStoreNames, findListSources, listFunctions } from "./debug";
 import { patchDMRow } from "./dmrow";
 
 let patches: (() => void)[] = [];
@@ -95,9 +96,18 @@ export default {
             }
         }
 
-        // The real target: the home drawer's DM row. The store filter above is
-        // proven to filter correctly but the drawer doesn't read from it.
+        // The home drawer row, kept in case the experiment is enabled on some builds.
         patches.push(...patchDMRow());
+
+        // Behavioural search: whatever store getter currently returns a list
+        // containing a hidden id is, by definition, holding the channel we want
+        // gone. Patch those regardless of what they're named.
+        const sources = findListSources(hiddenIds());
+        diag.sources = sources.map((s) => `${s.store}.${s.fn} (${s.hits})`);
+
+        for (const { store: storeName, fn } of sources) {
+            tryPatch(`${storeName}.${fn}`, findByStoreName(storeName), fn);
+        }
 
         if (!patches.length) {
             logger.warn("[HideGroupDMs] Nothing was patched.");

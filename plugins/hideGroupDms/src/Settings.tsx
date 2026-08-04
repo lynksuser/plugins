@@ -57,6 +57,11 @@ function Diagnostics() {
                 subLabel={hiddenIds().join(", ") || "none"}
             />
             <FormDivider />
+            <FormRow
+                label="Stores found holding a hidden id"
+                subLabel={diag.sources.join("\n") || "none found at load"}
+            />
+            <FormDivider />
             {patched.map((label, i) => {
                 const calls = diag.calls[label] ?? 0;
                 const removed = diag.removed[label] ?? 0;

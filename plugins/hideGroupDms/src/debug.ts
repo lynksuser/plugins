@@ -101,6 +101,77 @@ export function channelStoreNames(): string[] {
 }
 
 /**
+ * Zero-argument `get*` functions on a module, prototype chain included.
+ *
+ * Restricted to `get*` with arity 0 deliberately: those are conventionally pure
+ * reads, so calling them to inspect their output is safe. Hooks (`use*`) are
+ * excluded because calling one outside render throws.
+ */
+function zeroArgGetters(mod: any): string[] {
+    const out = new Set<string>();
+    let obj: any = mod;
+
+    while (obj && obj !== Object.prototype) {
+        for (const key of Object.getOwnPropertyNames(obj)) {
+            if (key === "constructor" || !/^get/.test(key)) continue;
+            try {
+                const value = mod[key];
+                if (typeof value === "function" && value.length === 0) out.add(key);
+            } catch {
+                // getter threw — ignore
+            }
+        }
+        obj = Object.getPrototypeOf(obj);
+    }
+
+    return [...out].sort();
+}
+
+/**
+ * Finds which store getters actually return a list containing the given ids.
+ *
+ * This inverts the approach that failed for six rounds: instead of guessing a
+ * name and checking whether it matters, ask every store what it currently holds
+ * and keep whatever already contains the channel we want gone.
+ */
+export function findListSources(
+    ids: string[]
+): Array<{ store: string; fn: string; hits: number }> {
+    const out: Array<{ store: string; fn: string; hits: number }> = [];
+    if (!ids.length) return out;
+
+    for (const storeName of storeNames()) {
+        let store: any;
+        try {
+            store = (metro as any).findByStoreName(storeName);
+        } catch {
+            continue;
+        }
+        if (!store) continue;
+
+        for (const fn of zeroArgGetters(store)) {
+            let ret: any;
+            try {
+                ret = store[fn]();
+            } catch {
+                continue;
+            }
+            if (!Array.isArray(ret) || ret.length === 0) continue;
+
+            let hits = 0;
+            for (const entry of ret) {
+                const id = typeof entry === "string" ? entry : entry?.id;
+                if (id && ids.includes(id)) hits++;
+            }
+
+            if (hits) out.push({ store: storeName, fn, hits });
+        }
+    }
+
+    return out;
+}
+
+/**
  * List-shaped function names on a module.
  *
  * Walks the prototype chain with getOwnPropertyNames: Flux store methods are

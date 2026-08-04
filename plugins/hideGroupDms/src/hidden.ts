@@ -30,6 +30,8 @@ export const diag = {
     calls: {} as Record<string, number>,
     removed: {} as Record<string, number>,
     sample: {} as Record<string, string>,
+    // Store getters found to actually contain a hidden id at load time.
+    sources: [] as string[],
 };
 
 export function noteCall(surface: string) {
