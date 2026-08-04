@@ -55,6 +55,15 @@ export function noteResult(surface: string, before: unknown, after: unknown) {
 
 export const hiddenIds = (): string[] => Object.keys(storage.hidden ?? {});
 
+// Row-rendering report. `shapes` is a capped list of distinct row signatures seen
+// by RowManager — that's what tells us whether DM list rows go through it at all.
+export const rowDiag = {
+    status: "not attempted",
+    calls: 0,
+    matched: 0,
+    shapes: [] as string[],
+};
+
 // References captured *before* patching, so the settings page can enumerate
 // channels without seeing its own filter applied.
 export const originals: Record<string, ((...args: any[]) => any) | undefined> = {};

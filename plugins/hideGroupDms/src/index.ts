@@ -10,8 +10,10 @@ import {
     noteResult,
     originals,
     refreshChannelList,
+    rowDiag,
 } from "./hidden";
 import { channelStoreNames, listFunctions } from "./debug";
+import { patchRows } from "./rows";
 
 let patches: (() => void)[] = [];
 
@@ -93,6 +95,10 @@ export default {
             }
         }
 
+        // Row-level hiding. Independent of the store filter above: that one is
+        // proven to filter correctly but isn't what Kettu renders from.
+        patches.push(...patchRows());
+
         if (!patches.length) {
             logger.warn("[HideGroupDMs] Nothing was patched.");
             return;
@@ -110,6 +116,10 @@ export default {
         diag.calls = {};
         diag.removed = {};
         diag.sample = {};
+        rowDiag.status = "not attempted";
+        rowDiag.calls = 0;
+        rowDiag.matched = 0;
+        rowDiag.shapes = [];
         refreshChannelList();
     },
 
