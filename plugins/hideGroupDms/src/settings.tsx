@@ -4,9 +4,9 @@ import { storage } from "@vendetta/plugin";
 import { useProxy } from "@vendetta/storage";
 import { Forms } from "@vendetta/ui/components";
 
-import { isHidden, setHidden } from "./hidden";
+import { diag, isHidden, originals, setHidden } from "./hidden";
 
-const { FormSection, FormSwitchRow, FormText, FormDivider } = Forms;
+const { FormSection, FormSwitchRow, FormText, FormDivider, FormRow } = Forms;
 
 const ChannelStore = findByStoreName("ChannelStore");
 const UserStore = findByStoreName("UserStore");
@@ -23,17 +23,52 @@ function channelLabel(channel: any): string {
     return names.length ? names.join(", ") : "Unnamed group";
 }
 
-// Deliberately reads ChannelStore, not the sort store we patch in index.ts —
-// otherwise hidden groups would vanish from this list and be impossible to unhide.
+// Reads getMutablePrivateChannels (which we never patch) first, falling back to
+// the pre-patch handle index.ts captured. Using a patched function here would
+// hide groups from their own toggle and make them impossible to unhide.
 function getGroupDMs(): any[] {
     const mutable = ChannelStore?.getMutablePrivateChannels?.();
     const list = mutable
         ? Object.values(mutable)
-        : ChannelStore?.getSortedPrivateChannels?.() ?? [];
+        : originals["ChannelStore.getSortedPrivateChannels"]?.() ?? [];
 
     return (list as any[])
         .filter((c) => c?.type === GROUP_DM)
         .sort((a, b) => channelLabel(a).localeCompare(channelLabel(b)));
+}
+
+function Diagnostics() {
+    const patched = diag.patched;
+
+    if (!patched.length) {
+        return (
+            <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                Nothing was patched. None of the candidate modules exist on this client,
+                so hiding cannot work yet.
+            </FormText>
+        );
+    }
+
+    return (
+        <>
+            {patched.map((label, i) => {
+                const count = diag.calls[label] ?? 0;
+                return (
+                    <React.Fragment key={label}>
+                        <FormRow
+                            label={label}
+                            subLabel={
+                                count > 0
+                                    ? `called ${count}x — this one is live`
+                                    : "never called — not what renders your list"
+                            }
+                        />
+                        {i < patched.length - 1 && <FormDivider />}
+                    </React.Fragment>
+                );
+            })}
+        </>
+    );
 }
 
 export default function Settings() {
@@ -61,6 +96,10 @@ export default function Settings() {
                         </React.Fragment>
                     ))
                 )}
+            </FormSection>
+
+            <FormSection title="Diagnostics">
+                <Diagnostics />
             </FormSection>
         </RN.ScrollView>
     );
