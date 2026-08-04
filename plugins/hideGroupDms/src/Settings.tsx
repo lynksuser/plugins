@@ -4,7 +4,7 @@ import { storage } from "@vendetta/plugin";
 import { useProxy } from "@vendetta/storage";
 import { Forms } from "@vendetta/ui/components";
 
-import { diag, isHidden, originals, setHidden } from "./hidden";
+import { diag, hiddenIds, isHidden, originals, setHidden } from "./hidden";
 import {
     channelStoreNames,
     listFunctions,
@@ -56,17 +56,27 @@ function Diagnostics() {
 
     return (
         <>
+            <FormRow
+                label="Hidden ids in storage"
+                subLabel={hiddenIds().join(", ") || "none"}
+            />
+            <FormDivider />
             {patched.map((label, i) => {
-                const count = diag.calls[label] ?? 0;
+                const calls = diag.calls[label] ?? 0;
+                const removed = diag.removed[label] ?? 0;
+                const sample = diag.sample[label];
+
+                let status: string;
+                if (calls === 0) status = "never called — not what renders your list";
+                else if (removed === 0)
+                    status = `called ${calls}x but removed nothing — ids don't match`;
+                else status = `called ${calls}x, removed ${removed} — filter is working`;
+
                 return (
                     <React.Fragment key={label}>
                         <FormRow
                             label={label}
-                            subLabel={
-                                count > 0
-                                    ? `called ${count}x — this one is live`
-                                    : "never called — not what renders your list"
-                            }
+                            subLabel={sample ? `${status}\nsaw: ${sample}` : status}
                         />
                         {i < patched.length - 1 && <FormDivider />}
                     </React.Fragment>

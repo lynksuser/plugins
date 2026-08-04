@@ -19,17 +19,41 @@ export function setHidden(id: string, hidden: boolean) {
     refreshChannelList();
 }
 
-// Runtime report, surfaced in the settings page. `patched` is what we hooked;
-// `calls` counts how many times each hook actually fired. A surface that is
-// patched but never called is not what renders your DM list.
+// Runtime report, surfaced in the settings page.
+//   patched — what we hooked
+//   calls   — how many times each hook fired; 0 means it isn't what draws the list
+//   removed — how many entries the filter actually dropped; 0 with calls > 0 means
+//             the ids don't match what we stored
+//   sample  — first few raw entries, so we can compare id shape by eye
 export const diag = {
     patched: [] as string[],
     calls: {} as Record<string, number>,
+    removed: {} as Record<string, number>,
+    sample: {} as Record<string, string>,
 };
 
 export function noteCall(surface: string) {
     diag.calls[surface] = (diag.calls[surface] ?? 0) + 1;
 }
+
+export function noteResult(surface: string, before: unknown, after: unknown) {
+    if (!Array.isArray(before) || !Array.isArray(after)) return;
+
+    diag.removed[surface] =
+        (diag.removed[surface] ?? 0) + (before.length - after.length);
+
+    if (!diag.sample[surface]) {
+        try {
+            diag.sample[surface] = JSON.stringify(
+                before.slice(0, 3).map((e) => (e && typeof e === "object" ? e.id : e))
+            );
+        } catch {
+            diag.sample[surface] = "(unserialisable)";
+        }
+    }
+}
+
+export const hiddenIds = (): string[] => Object.keys(storage.hidden ?? {});
 
 // References captured *before* patching, so the settings page can enumerate
 // channels without seeing its own filter applied.
