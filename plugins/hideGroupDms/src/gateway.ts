@@ -1,77 +1,56 @@
 import { FluxDispatcher } from "@vendetta/metro/common";
-import { before } from "@vendetta/patcher";
+import { after, before } from "@vendetta/patcher";
 
-import { gatewayDiag, isHidden } from "./hidden";
+import { isHidden } from "./hidden";
 import { hideNow } from "./localdelete";
 
-/**
- * Filters hidden channels out of the gateway payload before any store or the
- * local app database ingests it.
- *
- * Both Flux stores and Discord mobile's app_database are downstream of these
- * dispatches, so this is upstream of every read path — which matters because we
- * proved filtering the store getters has no effect on what's drawn.
- *
- * Pattern borrowed from revengeplugin/HideBlockedAndIgnoredMessages, which
- * filters LOAD_MESSAGES_SUCCESS the same way.
- */
+// This build uses initialPrivateChannels; the others are kept for older ones.
+const READY_KEYS = ["initialPrivateChannels", "privateChannels", "private_channels"];
+
 export function patchGateway(): Array<() => void> {
-    const unpatch = before("dispatch", FluxDispatcher, (args: any[]) => {
-        // This runs on EVERY Flux action in the app. An exception escaping here
-        // takes down the dispatcher, not just this plugin — so the whole body is
-        // guarded. Losing our filter is survivable; breaking dispatch is not.
+    // Strip hidden channels from the login payload so they are never ingested in
+    // the first place. This is what stops the channel appearing at startup and
+    // then vanishing a moment later.
+    const unBefore = before("dispatch", FluxDispatcher, (args: any[]) => {
+        // Runs on every action in the app: an exception escaping here breaks the
+        // dispatcher, not just this plugin.
         try {
             const event = args?.[0];
-            if (!event || typeof event !== "object" || !event.type) return;
+            if (event?.type !== "CONNECTION_OPEN") return;
 
-            if (event.type === "CONNECTION_OPEN") {
-                gatewayDiag.connectionOpen++;
+            for (const key of READY_KEYS) {
+                const list = event[key];
+                if (!Array.isArray(list)) continue;
 
-                // Record the shape once: if neither key below exists, this tells
-                // us where the list actually lives instead of us guessing again.
-                if (gatewayDiag.keys.length === 0) {
-                    gatewayDiag.keys = Object.keys(event).slice(0, 20);
-                }
-
-                // initialPrivateChannels is what this client build actually uses;
-                // the other two are kept for older/other builds.
-                const found: string[] = [];
-                for (const key of [
-                    "initialPrivateChannels",
-                    "privateChannels",
-                    "private_channels",
-                ]) {
-                    const list = event[key];
-                    if (!Array.isArray(list)) continue;
-
-                    found.push(`${key}(${list.length})`);
-                    gatewayDiag.listLength = list.length;
-
-                    // Entries are channel objects, but tolerate bare id strings.
-                    const kept = list.filter((c: any) =>
-                        typeof c === "string" ? !isHidden(c) : !isHidden(c?.id)
-                    );
-                    gatewayDiag.removed += list.length - kept.length;
-                    event[key] = kept;
-                }
-                // Record every key found, not just the last one examined.
-                if (found.length) gatewayDiag.listKey = found.join(" + ");
-
-                // Re-hide after the stores and database have ingested READY. This
-                // is a `before` hook, so nothing has consumed the payload yet.
-                setTimeout(hideNow, 1500);
-            }
-
-            // Discord re-adds the channel when a message arrives. Re-hide rather
-            // than blocking the event, so its own state stays coherent.
-            if (event.type === "CHANNEL_CREATE" && isHidden(event.channel?.id)) {
-                gatewayDiag.channelCreates++;
-                setTimeout(hideNow, 0);
+                event[key] = list.filter((c: any) =>
+                    typeof c === "string" ? !isHidden(c) : !isHidden(c?.id)
+                );
             }
         } catch {
-            // never let a diagnostic or filter break Discord's dispatcher
+            // never let our filter break Discord's dispatcher
         }
     });
 
-    return [unpatch];
+    // Safety net for anything the payload filter misses — a channel restored from
+    // the local database, or re-added when a message arrives.
+    //
+    // setTimeout(0) rather than calling hideNow() directly: we are inside a
+    // dispatch here, and Flux rejects a nested dispatch. Deferring by a tick also
+    // keeps this effectively immediate, unlike the 1.5s delay that caused the
+    // channel to flash into the list.
+    const unAfter = after("dispatch", FluxDispatcher, (args: any[]) => {
+        try {
+            const event = args?.[0];
+            const type = event?.type;
+
+            if (type === "CONNECTION_OPEN") setTimeout(hideNow, 0);
+            else if (type === "CHANNEL_CREATE" && isHidden(event.channel?.id)) {
+                setTimeout(hideNow, 0);
+            }
+        } catch {
+            // as above
+        }
+    });
+
+    return [unBefore, unAfter];
 }
