@@ -4,8 +4,8 @@ import { storage } from "@vendetta/plugin";
 import { useProxy } from "@vendetta/storage";
 import { Forms } from "@vendetta/ui/components";
 
-import { diag, hiddenIds, isHidden, originals, setHidden } from "./hidden";
-import { filePathStats, matchingPaths } from "./debug";
+import { diag, hiddenIds, isHidden, originals, rowDiag, setHidden } from "./hidden";
+import { filePathStats, matchingPaths, pathsUnder } from "./debug";
 
 const { FormSection, FormSwitchRow, FormText, FormDivider, FormRow } = Forms;
 
@@ -82,6 +82,50 @@ function Diagnostics() {
     );
 }
 
+// State of the home drawer DM row patch — the current best candidate.
+function DMRow() {
+    return (
+        <>
+            <FormRow label="Row patch" subLabel={rowDiag.status} />
+            <FormDivider />
+            <FormRow
+                label="Renders / hidden / no id found"
+                subLabel={`${rowDiag.calls} rendered, ${rowDiag.matched} hidden, ${rowDiag.noId} without an id`}
+            />
+            <FormDivider />
+            <FormRow
+                label="Row prop keys"
+                subLabel={rowDiag.propKeys.join(", ") || "none captured yet"}
+            />
+        </>
+    );
+}
+
+// The whole home_drawer subtree, so we can see the list component alongside the
+// row if the row patch turns out to be the wrong level.
+function HomeDrawer() {
+    const paths = React.useMemo(() => pathsUnder("home_drawer"), []);
+
+    if (paths.length === 0) {
+        return (
+            <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                Nothing imported from home_drawer yet. Open the DMs tab first.
+            </FormText>
+        );
+    }
+
+    return (
+        <>
+            {paths.map((m, i) => (
+                <React.Fragment key={m.id}>
+                    <FormRow label={m.path} subLabel={`module ${m.id}`} />
+                    {i < paths.length - 1 && <FormDivider />}
+                </React.Fragment>
+            ))}
+        </>
+    );
+}
+
 // Searches the source paths Kettu records for every module Discord imports.
 // These are Discord's own file names, so a match tells us where the DM list
 // actually lives instead of us guessing at prop names.
@@ -144,6 +188,14 @@ export default function Settings() {
 
             <FormSection title="Diagnostics">
                 <Diagnostics />
+            </FormSection>
+
+            <FormSection title="DM row patch">
+                <DMRow />
+            </FormSection>
+
+            <FormSection title="home_drawer modules">
+                <HomeDrawer />
             </FormSection>
 
             <FormSection title="Module paths">

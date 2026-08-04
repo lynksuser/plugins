@@ -10,8 +10,10 @@ import {
     noteResult,
     originals,
     refreshChannelList,
+    rowDiag,
 } from "./hidden";
 import { channelStoreNames, listFunctions } from "./debug";
+import { patchDMRow } from "./dmrow";
 
 let patches: (() => void)[] = [];
 
@@ -93,6 +95,10 @@ export default {
             }
         }
 
+        // The real target: the home drawer's DM row. The store filter above is
+        // proven to filter correctly but the drawer doesn't read from it.
+        patches.push(...patchDMRow());
+
         if (!patches.length) {
             logger.warn("[HideGroupDMs] Nothing was patched.");
             return;
@@ -110,6 +116,12 @@ export default {
         diag.calls = {};
         diag.removed = {};
         diag.sample = {};
+        rowDiag.status = "not attempted";
+        rowDiag.moduleId = "";
+        rowDiag.calls = 0;
+        rowDiag.matched = 0;
+        rowDiag.noId = 0;
+        rowDiag.propKeys = [];
         refreshChannelList();
     },
 

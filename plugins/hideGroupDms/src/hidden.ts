@@ -55,13 +55,16 @@ export function noteResult(surface: string, before: unknown, after: unknown) {
 
 export const hiddenIds = (): string[] => Object.keys(storage.hidden ?? {});
 
-// Row-rendering report. `shapes` is a capped list of distinct row signatures seen
-// by RowManager — that's what tells us whether DM list rows go through it at all.
+// Report for the DM row patch. `noId` counts renders where we found no channel
+// id in props — if that equals `calls`, the id lives somewhere we're not looking
+// and `propKeys` tells us where.
 export const rowDiag = {
     status: "not attempted",
+    moduleId: "",
     calls: 0,
     matched: 0,
-    shapes: [] as string[],
+    noId: 0,
+    propKeys: [] as string[],
 };
 
 // References captured *before* patching, so the settings page can enumerate

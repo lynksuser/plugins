@@ -24,6 +24,38 @@ export function filePathStats(): { total: number; withPath: number } {
     return { total, withPath };
 }
 
+/** Every recorded path under a given prefix, for exploring a subtree. */
+export function pathsUnder(prefix: string): Array<{ id: string; path: string }> {
+    const mods = moduleList();
+    const out: Array<{ id: string; path: string }> = [];
+
+    for (const id in mods) {
+        const path = mods[id]?.__filePath;
+        if (typeof path === "string" && path.includes(prefix)) out.push({ id, path });
+    }
+
+    return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * Resolves a module by source path rather than by id. Ids shift between Discord
+ * builds; paths don't. Only returns already-initialised modules, so this never
+ * forces a require.
+ */
+export function findByPath(re: RegExp): { id: string; exports: any } | null {
+    const mods = moduleList();
+
+    for (const id in mods) {
+        const path = mods[id]?.__filePath;
+        if (typeof path !== "string" || !re.test(path)) continue;
+
+        const exports = mods[id]?.publicModule?.exports;
+        if (exports) return { id, exports };
+    }
+
+    return null;
+}
+
 /** Modules whose Discord source path looks DM-list related. */
 export function matchingPaths(): Array<{ id: string; path: string }> {
     const mods = moduleList();
