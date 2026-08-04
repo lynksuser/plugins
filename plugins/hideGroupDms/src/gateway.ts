@@ -32,16 +32,24 @@ export function patchGateway(): Array<() => void> {
                     gatewayDiag.keys = Object.keys(event).slice(0, 20);
                 }
 
-                // camelCase on the Flux event, snake_case on the raw READY payload.
+                // initialPrivateChannels is what this client build actually uses;
+                // the other two are kept for older/other builds.
                 const found: string[] = [];
-                for (const key of ["privateChannels", "private_channels"]) {
+                for (const key of [
+                    "initialPrivateChannels",
+                    "privateChannels",
+                    "private_channels",
+                ]) {
                     const list = event[key];
                     if (!Array.isArray(list)) continue;
 
                     found.push(`${key}(${list.length})`);
                     gatewayDiag.listLength = list.length;
 
-                    const kept = list.filter((c: any) => !isHidden(c?.id));
+                    // Entries are channel objects, but tolerate bare id strings.
+                    const kept = list.filter((c: any) =>
+                        typeof c === "string" ? !isHidden(c) : !isHidden(c?.id)
+                    );
                     gatewayDiag.removed += list.length - kept.length;
                     event[key] = kept;
                 }
