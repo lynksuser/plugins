@@ -71,6 +71,17 @@ export const rowDiag = {
     propKeys: [] as string[],
 };
 
+// Gateway ingestion report. `keys` records the actual shape of CONNECTION_OPEN so
+// we can see where the private channel list lives if neither expected key exists.
+export const gatewayDiag = {
+    connectionOpen: 0,
+    listKey: "",
+    listLength: 0,
+    removed: 0,
+    channelCreates: 0,
+    keys: [] as string[],
+};
+
 // References captured *before* patching, so the settings page can enumerate
 // channels without seeing its own filter applied.
 export const originals: Record<string, ((...args: any[]) => any) | undefined> = {};

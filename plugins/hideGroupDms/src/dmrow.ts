@@ -46,15 +46,27 @@ export function patchDMRow(): Array<() => void> {
     if (typeof def === "function") {
         parent = mod;
         key = "default";
-        rowDiag.status = `patched default (module ${found.id})`;
     } else if (def && typeof def.type === "function") {
         parent = def;
         key = "type";
-        rowDiag.status = `patched default.type (module ${found.id})`;
     } else {
         rowDiag.status = `default export not callable: ${typeof def}`;
         return [];
     }
+
+    // Patching works by reassigning parent[key]. Metro's ESM interop often defines
+    // exports as accessor-only properties, where that assignment silently does
+    // nothing — the patch would report success and never fire. Check first, so a
+    // zero call count means "never rendered" rather than "never actually patched".
+    const desc = Object.getOwnPropertyDescriptor(parent, key);
+    const writable = !desc || desc.writable === true || typeof desc.set === "function";
+
+    if (!writable) {
+        rowDiag.status = `${key} is not writable (getter-only) — cannot patch module ${found.id}`;
+        return [];
+    }
+
+    rowDiag.status = `patched ${key} (module ${found.id})`;
 
     const unpatch = after(key, parent, (args: any[], ret: any) => {
         rowDiag.calls++;

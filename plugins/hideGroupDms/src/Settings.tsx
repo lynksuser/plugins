@@ -4,7 +4,14 @@ import { storage } from "@vendetta/plugin";
 import { useProxy } from "@vendetta/storage";
 import { Forms } from "@vendetta/ui/components";
 
-import { diag, hiddenIds, isHidden, originals, rowDiag, setHidden } from "./hidden";
+import {
+    diag,
+    gatewayDiag,
+    hiddenIds,
+    isHidden,
+    originals,
+    setHidden,
+} from "./hidden";
 import { filePathStats, matchingPaths, pathsUnder } from "./debug";
 
 const { FormSection, FormSwitchRow, FormText, FormDivider, FormRow } = Forms;
@@ -85,34 +92,51 @@ function Diagnostics() {
     );
 }
 
-// State of the home drawer DM row patch — the current best candidate.
-function DMRow() {
+// Whether we caught the gateway payload and removed the channel before any store
+// or the local database saw it.
+function Gateway() {
     return (
         <>
-            <FormRow label="Row patch" subLabel={rowDiag.status} />
-            <FormDivider />
             <FormRow
-                label="Renders / hidden / no id found"
-                subLabel={`${rowDiag.calls} rendered, ${rowDiag.matched} hidden, ${rowDiag.noId} without an id`}
+                label="CONNECTION_OPEN seen"
+                subLabel={
+                    gatewayDiag.connectionOpen === 0
+                        ? "not since load — restart Discord with the plugin enabled"
+                        : `${gatewayDiag.connectionOpen}x`
+                }
             />
             <FormDivider />
             <FormRow
-                label="Row prop keys"
-                subLabel={rowDiag.propKeys.join(", ") || "none captured yet"}
+                label="Private channel list in payload"
+                subLabel={
+                    gatewayDiag.listKey
+                        ? `${gatewayDiag.listKey}, ${gatewayDiag.listLength} entries, ${gatewayDiag.removed} removed`
+                        : "neither privateChannels nor private_channels found"
+                }
+            />
+            <FormDivider />
+            <FormRow
+                label="CONNECTION_OPEN keys"
+                subLabel={gatewayDiag.keys.join(", ") || "none captured yet"}
+            />
+            <FormDivider />
+            <FormRow
+                label="CHANNEL_CREATE for a hidden id"
+                subLabel={`${gatewayDiag.channelCreates}x (counted, not blocked)`}
             />
         </>
     );
 }
 
-// The whole home_drawer subtree, so we can see the list component alongside the
-// row if the row patch turns out to be the wrong level.
-function HomeDrawer() {
-    const paths = React.useMemo(() => pathsUnder("home_drawer"), []);
+// The app_database subtree. Discord mobile queries a local database for lists,
+// which would explain why filtering Flux store getters changes nothing on screen.
+function AppDatabase() {
+    const paths = React.useMemo(() => pathsUnder("app_database"), []);
 
     if (paths.length === 0) {
         return (
             <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                Nothing imported from home_drawer yet. Open the DMs tab first.
+                Nothing imported from app_database.
             </FormText>
         );
     }
@@ -193,12 +217,12 @@ export default function Settings() {
                 <Diagnostics />
             </FormSection>
 
-            <FormSection title="DM row patch">
-                <DMRow />
+            <FormSection title="Gateway">
+                <Gateway />
             </FormSection>
 
-            <FormSection title="home_drawer modules">
-                <HomeDrawer />
+            <FormSection title="app_database modules">
+                <AppDatabase />
             </FormSection>
 
             <FormSection title="Module paths">

@@ -5,6 +5,7 @@ import { after } from "@vendetta/patcher";
 import Settings from "./Settings";
 import {
     diag,
+    gatewayDiag,
     hiddenIds,
     isHidden,
     noteCall,
@@ -16,6 +17,7 @@ import {
 } from "./hidden";
 import { channelStoreNames, findListSources, listFunctions } from "./debug";
 import { patchDMRow } from "./dmrow";
+import { patchGateway } from "./gateway";
 
 let patches: (() => void)[] = [];
 
@@ -104,6 +106,10 @@ export default {
             }
         }
 
+        // Upstream of every read path — stores and the app database both ingest
+        // from these dispatches. Only takes effect on the next connect.
+        patches.push(...patchGateway());
+
         // The home drawer row, kept in case the experiment is enabled on some builds.
         patches.push(...patchDMRow());
 
@@ -140,6 +146,12 @@ export default {
         rowDiag.matched = 0;
         rowDiag.noId = 0;
         rowDiag.propKeys = [];
+        gatewayDiag.connectionOpen = 0;
+        gatewayDiag.listKey = "";
+        gatewayDiag.listLength = 0;
+        gatewayDiag.removed = 0;
+        gatewayDiag.channelCreates = 0;
+        gatewayDiag.keys = [];
         refreshChannelList();
     },
 
