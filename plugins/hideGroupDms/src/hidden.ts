@@ -19,6 +19,10 @@ export function setHidden(id: string, hidden: boolean) {
     storage.hidden = next;
 
     refreshChannelList();
+
+    // Apply immediately rather than waiting for the next connect. Required late
+    // to avoid a circular import: localdelete reads hiddenIds from this module.
+    if (hidden) require("./localdelete").hideNow();
 }
 
 // Runtime report, surfaced in the settings page.
@@ -80,6 +84,8 @@ export const gatewayDiag = {
     removed: 0,
     channelCreates: 0,
     keys: [] as string[],
+    // CHANNEL_DELETE dispatches we've issued locally.
+    deletes: 0,
 };
 
 // References captured *before* patching, so the settings page can enumerate

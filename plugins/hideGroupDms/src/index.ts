@@ -18,6 +18,7 @@ import {
 import { channelStoreNames, findListSources, listFunctions } from "./debug";
 import { patchDMRow } from "./dmrow";
 import { patchGateway } from "./gateway";
+import { hideNow } from "./localdelete";
 
 let patches: (() => void)[] = [];
 
@@ -107,8 +108,12 @@ export default {
         }
 
         // Upstream of every read path — stores and the app database both ingest
-        // from these dispatches. Only takes effect on the next connect.
+        // from these dispatches. Also schedules a re-hide after each connect.
         patches.push(...patchGateway());
+
+        // The actual mechanism: locally delete the channel instead of filtering
+        // whatever happens to read it.
+        hideNow();
 
         // The home drawer row, kept in case the experiment is enabled on some builds.
         patches.push(...patchDMRow());

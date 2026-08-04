@@ -2,6 +2,7 @@ import { FluxDispatcher } from "@vendetta/metro/common";
 import { before } from "@vendetta/patcher";
 
 import { gatewayDiag, isHidden } from "./hidden";
+import { hideNow } from "./localdelete";
 
 /**
  * Filters hidden channels out of the gateway payload before any store or the
@@ -55,13 +56,17 @@ export function patchGateway(): Array<() => void> {
                 }
                 // Record every key found, not just the last one examined.
                 if (found.length) gatewayDiag.listKey = found.join(" + ");
+
+                // Re-hide after the stores and database have ingested READY. This
+                // is a `before` hook, so nothing has consumed the payload yet.
+                setTimeout(hideNow, 1500);
             }
 
-            // Counted, not blocked. Dropping a live CHANNEL_CREATE risks leaving
-            // the client thinking you left the group; worth knowing whether it
-            // fires before deciding to interfere with it.
+            // Discord re-adds the channel when a message arrives. Re-hide rather
+            // than blocking the event, so its own state stays coherent.
             if (event.type === "CHANNEL_CREATE" && isHidden(event.channel?.id)) {
                 gatewayDiag.channelCreates++;
+                setTimeout(hideNow, 0);
             }
         } catch {
             // never let a diagnostic or filter break Discord's dispatcher
