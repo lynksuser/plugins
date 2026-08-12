@@ -1,4 +1,5 @@
-import { ReactNative as RN } from "@vendetta/metro/common";
+import { findByName, findByProps } from "@vendetta/metro";
+import { React, ReactNative as RN } from "@vendetta/metro/common";
 import { storage } from "@vendetta/plugin";
 import { useProxy } from "@vendetta/storage";
 import { Forms } from "@vendetta/ui/components";
@@ -7,27 +8,34 @@ import { hideNow } from "./localdelete";
 
 const { FormSection, FormSwitchRow, FormText } = Forms;
 
+// Safely dig up Discord's internal TextInput component if the standard one was stripped
+const DiscordTextInput = 
+    findByName("TextInput") ?? 
+    findByProps("TextInput")?.TextInput ?? 
+    RN.TextInput;
+
 export default function Settings() {
     useProxy(storage);
 
     return (
         <RN.ScrollView style={{ flex: 1 }}>
             <FormSection title="Configuration">
-                {/* Replaced FormInputRow with a standard React Native View and TextInput */}
                 <RN.View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
                     <FormText style={{ marginBottom: 8 }}>
                         Group DM ID
                     </FormText>
-                    <RN.TextInput
+                    <DiscordTextInput
                         style={{
-                            color: "white",
-                            backgroundColor: "rgba(255, 255, 255, 0.1)",
+                            borderWidth: 1,
+                            borderColor: "rgba(128, 128, 128, 0.3)",
+                            backgroundColor: "rgba(128, 128, 128, 0.1)",
+                            color: "gray",
                             borderRadius: 8,
                             padding: 12,
                             fontSize: 16,
                         }}
                         placeholder="Paste the Channel ID here..."
-                        placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                        placeholderTextColor="rgba(128, 128, 128, 0.6)"
                         value={storage.targetGroupId || ""}
                         onChangeText={(text: string) => {
                             storage.targetGroupId = text;
