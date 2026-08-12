@@ -139,7 +139,7 @@ export default function Settings() {
                 <FormText
                     style={{ paddingHorizontal: 16, paddingVertical: 12, opacity: 0.7 }}
                 >
-                    Hiding a group DM tells the local client (not the server) that the channel was deleted, hiding it from view while allowing you to stay in the group DM with no visible change. 
+                    Hiding a group DM tells the local client (not the server) that the channel was deleted, hiding it from view while allowing you to stay in the group DM with no change visible to other group members. 
                 </FormText>
             </FormSection>
         </RN.ScrollView>
