@@ -51,38 +51,82 @@ function toggleableGroups(): Array<{ id: string; label: string }> {
 export default function Settings() {
     useProxy(storage);
 
-    // Recomputed per render rather than memoised: toggling changes this list,
-    // because hiding removes the channel from ChannelStore.
-    const groups = toggleableGroups();
+    // Add state for our search bar
+    const [searchQuery, setSearchQuery] = React.useState("");
+
+    // Get all groups
+    const allGroups = toggleableGroups();
+
+    // Filter groups by name or exact ID based on search input
+    let groups = allGroups.filter(g => 
+        g.label.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        g.id.includes(searchQuery)
+    );
+
+    // Limit to 50 results to prevent the settings page from lagging
+    // (React Native ScrollViews get slow with hundreds of items)
+    const hasMore = groups.length > 50;
+    groups = groups.slice(0, 50);
 
     return (
         <RN.ScrollView style={{ flex: 1 }}>
-            <FormSection title="Group DMs">
+            {/* Search Bar UI */}
+            <RN.View style={{ padding: 16, paddingBottom: 0 }}>
+                <RN.TextInput
+                    style={{
+                        backgroundColor: "rgba(128, 128, 128, 0.1)",
+                        color: "white",
+                        borderRadius: 8,
+                        padding: 12,
+                        fontSize: 16,
+                        borderWidth: 1,
+                        borderColor: "rgba(128, 128, 128, 0.3)"
+                    }}
+                    placeholder="Search group DMs by name or ID..."
+                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </RN.View>
+
+            <FormSection title={searchQuery ? "Search Results" : "Group DMs"}>
                 {groups.length === 0 ? (
                     <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-                        No group DMs found.
+                        {allGroups.length === 0 
+                            ? "No group DMs found." 
+                            : "No group DMs match your search."}
                     </FormText>
                 ) : (
-                    groups.map((group, i) => (
-                        <React.Fragment key={group.id}>
-                            <FormSwitchRow
-                                label={group.label}
-                                subLabel={
-                                    isHidden(group.id)
-                                        ? "Hidden on this device"
-                                        : "Visible"
-                                }
-                                value={isHidden(group.id)}
-                                onValueChange={(hidden: boolean) => {
-                                    setHidden(group.id, group.label, hidden);
-                                    // Called here rather than inside setHidden so
-                                    // hidden.ts stays free of a circular import.
-                                    if (hidden) hideNow();
-                                }}
-                            />
-                            {i < groups.length - 1 && <FormDivider />}
-                        </React.Fragment>
-                    ))
+                    <>
+                        {groups.map((group, i) => (
+                            <React.Fragment key={group.id}>
+                                <FormSwitchRow
+                                    label={group.label}
+                                    subLabel={
+                                        isHidden(group.id)
+                                            ? "Hidden on this device"
+                                            : "Visible"
+                                    }
+                                    value={isHidden(group.id)}
+                                    onValueChange={(hidden: boolean) => {
+                                        setHidden(group.id, group.label, hidden);
+                                        if (hidden) hideNow();
+                                    }}
+                                />
+                                {i < groups.length - 1 && <FormDivider />}
+                            </React.Fragment>
+                        ))}
+                        
+                        {/* Notice if there are too many results to show */}
+                        {hasMore && (
+                            <>
+                                <FormDivider />
+                                <FormText style={{ padding: 16, textAlign: "center", opacity: 0.6 }}>
+                                    + {allGroups.length - 50} more. Use the search bar to find them.
+                                </FormText>
+                            </>
+                        )}
+                    </>
                 )}
             </FormSection>
 
