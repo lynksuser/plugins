@@ -36,7 +36,7 @@ export default function Settings() {
                         }}
                         placeholder="Paste the Channel ID here..."
                         placeholderTextColor="rgba(128, 128, 128, 0.6)"
-                        value={storage.targetGroupId || ""}
+                        defaultValue={storage.targetGroupId || ""}
                         onChangeText={(text: string) => {
                             storage.targetGroupId = text;
                             if (storage.hideMyGroup) hideNow();
