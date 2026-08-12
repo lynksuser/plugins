@@ -1,17 +1,24 @@
 import { logger } from "@vendetta";
+
 import Settings from "./Settings";
-import { hideNow, startWatching, stopWatching } from "./localdelete";
+import { patchGateway } from "./gateway";
+import { hideNow } from "./localdelete";
+
+let patches: Array<() => void> = [];
 
 export default {
     onLoad() {
+        patches = patchGateway();
+
         hideNow();
-        startWatching();
 
         logger.log("[HideGroupDMs] loaded");
     },
 
     onUnload() {
-        stopWatching();
+        patches.forEach((unpatch) => unpatch?.());
+        patches = [];
+        // Nothing to restore: hidden channels come back with the next READY.
     },
 
     settings: Settings,
