@@ -5,7 +5,7 @@ import { Forms } from "@vendetta/ui/components";
 
 import { hideNow } from "./localdelete";
 
-const { FormSection, FormInputRow, FormSwitchRow, FormText } = Forms;
+const { FormSection, FormSwitchRow, FormText } = Forms;
 
 export default function Settings() {
     useProxy(storage);
@@ -13,16 +13,29 @@ export default function Settings() {
     return (
         <RN.ScrollView style={{ flex: 1 }}>
             <FormSection title="Configuration">
-                <FormInputRow
-                    label="Group DM ID"
-                    subLabel="Paste the Channel ID you want to hide"
-                    placeholder="123456789012345678"
-                    value={storage.targetGroupId || ""}
-                    onChangeText={(text: string) => {
-                        storage.targetGroupId = text;
-                        if (storage.hideMyGroup) hideNow();
-                    }}
-                />
+                {/* Replaced FormInputRow with a standard React Native View and TextInput */}
+                <RN.View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                    <FormText style={{ marginBottom: 8 }}>
+                        Group DM ID
+                    </FormText>
+                    <RN.TextInput
+                        style={{
+                            color: "white",
+                            backgroundColor: "rgba(255, 255, 255, 0.1)",
+                            borderRadius: 8,
+                            padding: 12,
+                            fontSize: 16,
+                        }}
+                        placeholder="Paste the Channel ID here..."
+                        placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                        value={storage.targetGroupId || ""}
+                        onChangeText={(text: string) => {
+                            storage.targetGroupId = text;
+                            if (storage.hideMyGroup) hideNow();
+                        }}
+                    />
+                </RN.View>
+
                 <FormSwitchRow
                     label="Hide Group DM"
                     subLabel={
