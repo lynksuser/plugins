@@ -24,53 +24,58 @@ function channelLabel(channel: any): string {
     return names.length ? names.join(", ") : "Unnamed group";
 }
 
-/**
- * Every group DM that can be toggled: the ones Discord currently knows about,
- * merged with everything we've recorded. Hidden channels are absent from
- * ChannelStore by design, so the stored half is what keeps them listed.
- */
-function toggleableGroups(): Array<{ id: string; label: string }> {
-    const mutable = ChannelStore?.getMutablePrivateChannels?.();
-    const live = mutable
-        ? Object.values(mutable)
-        : ChannelStore?.getSortedPrivateChannels?.() ?? [];
-
-    const visible = (live as any[])
-        .filter((c) => c?.type === GROUP_DM)
-        .map((c) => ({ id: c.id, label: channelLabel(c) }));
-
-    // Keep labels current while we can still read them.
-    for (const group of visible) remember(group.id, group.label);
-
-    const seen = new Set(visible.map((g) => g.id));
-    const stored = knownGroups().filter((g) => !seen.has(g.id));
-
-    return [...visible, ...stored].sort((a, b) => a.label.localeCompare(b.label));
-}
-
 export default function Settings() {
     useProxy(storage);
 
-    // Add state for our search bar
     const [searchQuery, setSearchQuery] = React.useState("");
 
-    // Get all groups
-    const allGroups = toggleableGroups();
+    // --- SPEED OPTIMIZATION: Move writes out of the render cycle ---
+    // Instead of saving labels while typing the search query, do it once when settings open
+    React.useEffect(() => {
+        const mutable = ChannelStore?.getMutablePrivateChannels?.();
+        const live = mutable
+            ? Object.values(mutable)
+            : ChannelStore?.getSortedPrivateChannels?.() ?? [];
 
-    // Filter groups by name or exact ID based on search input
-    let groups = allGroups.filter(g => 
-        g.label.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        g.id.includes(searchQuery)
-    );
+        const visible = (live as any[])
+            .filter((c) => c?.type === GROUP_DM);
+        
+        for (const c of visible) {
+            remember(c.id, channelLabel(c));
+        }
+    }, []);
 
-    // Limit to 50 results to prevent the settings page from lagging
-    // (React Native ScrollViews get slow with hundreds of items)
-    const hasMore = groups.length > 50;
-    groups = groups.slice(0, 50);
+    // --- SPEED OPTIMIZATION: Memoization ---
+    // Only fetch from the Discord store once. Prevents massive lag when typing.
+    const allGroups = React.useMemo(() => {
+        const mutable = ChannelStore?.getMutablePrivateChannels?.();
+        const live = mutable
+            ? Object.values(mutable)
+            : ChannelStore?.getSortedPrivateChannels?.() ?? [];
+
+        const visible = (live as any[])
+            .filter((c) => c?.type === GROUP_DM)
+            .map((c) => ({ id: c.id, label: channelLabel(c) }));
+
+        const seen = new Set(visible.map((g) => g.id));
+        const stored = knownGroups().filter((g) => !seen.has(g.id));
+
+        return [...visible, ...stored].sort((a, b) => a.label.localeCompare(b.label));
+    }, []); // Empty dependency array = only runs on component mount
+
+    // Fast local filter based on the memoized list
+    const filteredGroups = React.useMemo(() => {
+        return allGroups.filter(g => 
+            g.label.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            g.id.includes(searchQuery)
+        );
+    }, [allGroups, searchQuery]);
+
+    const hasMore = filteredGroups.length > 50;
+    const visibleGroups = filteredGroups.slice(0, 50);
 
     return (
         <RN.ScrollView style={{ flex: 1 }}>
-            {/* Search Bar UI */}
             <RN.View style={{ padding: 16, paddingBottom: 0 }}>
                 <RN.TextInput
                     style={{
@@ -90,7 +95,7 @@ export default function Settings() {
             </RN.View>
 
             <FormSection title={searchQuery ? "Search Results" : "Group DMs"}>
-                {groups.length === 0 ? (
+                {visibleGroups.length === 0 ? (
                     <FormText style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
                         {allGroups.length === 0 
                             ? "No group DMs found." 
@@ -98,7 +103,7 @@ export default function Settings() {
                     </FormText>
                 ) : (
                     <>
-                        {groups.map((group, i) => (
+                        {visibleGroups.map((group, i) => (
                             <React.Fragment key={group.id}>
                                 <FormSwitchRow
                                     label={group.label}
@@ -110,19 +115,19 @@ export default function Settings() {
                                     value={isHidden(group.id)}
                                     onValueChange={(hidden: boolean) => {
                                         setHidden(group.id, group.label, hidden);
-                                        if (hidden) hideNow();
+                                        // Targeted hide is fast and won't drop frames
+                                        if (hidden) hideNow(group.id);
                                     }}
                                 />
-                                {i < groups.length - 1 && <FormDivider />}
+                                {i < visibleGroups.length - 1 && <FormDivider />}
                             </React.Fragment>
                         ))}
                         
-                        {/* Notice if there are too many results to show */}
                         {hasMore && (
                             <>
                                 <FormDivider />
                                 <FormText style={{ padding: 16, textAlign: "center", opacity: 0.6 }}>
-                                    + {allGroups.length - 50} more. Use the search bar to find them.
+                                    + {filteredGroups.length - 50} more. Use the search bar to find them.
                                 </FormText>
                             </>
                         )}
@@ -134,10 +139,7 @@ export default function Settings() {
                 <FormText
                     style={{ paddingHorizontal: 16, paddingVertical: 12, opacity: 0.7 }}
                 >
-                    Hiding tells this device the channel was deleted. Nothing is sent to
-                    Discord, so you stay in the group and nobody else sees a change.
-                    Un-hiding takes effect once Discord next syncs the channel, which is
-                    usually on restart.
+                    Hiding a group DM tells the local client (not the server) that the channel was deleted, hiding it from view while allowing you to stay in the group DM with no visible change. 
                 </FormText>
             </FormSection>
         </RN.ScrollView>
