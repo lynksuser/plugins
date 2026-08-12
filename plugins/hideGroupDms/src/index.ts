@@ -2,7 +2,7 @@ import { logger } from "@vendetta";
 
 import Settings from "./Settings";
 import { patchGateway } from "./gateway";
-import { hideNow } from "./localdelete";
+import { hideNow, startWatching, stopWatching } from "./localdelete";
 
 let patches: Array<() => void> = [];
 
@@ -10,9 +10,8 @@ export default {
     onLoad() {
         patches = patchGateway();
 
-        // Covers the case where the plugin loads after Discord has already
-        // connected — enabling it from settings, or a plugin reload.
         hideNow();
+        startWatching(); // watch for server revivals
 
         logger.log("[HideGroupDMs] loaded");
     },
@@ -20,7 +19,8 @@ export default {
     onUnload() {
         patches.forEach((unpatch) => unpatch?.());
         patches = [];
-        // Nothing to restore: hidden channels come back with the next READY.
+
+        stopWatching();
     },
 
     settings: Settings,
