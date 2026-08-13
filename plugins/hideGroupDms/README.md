@@ -8,4 +8,4 @@ Choose the group DMs you want to hide from the plugin settings, and toggle betwe
 
 DMs will not appear again on a new message; they will stay hidden until you unhide it.
 
-Works by lying to the local client that the DM has been deleted. DMs may occasionally "blink" back into view in the channel list, but it should immediately disappear. 
+Works by lying to the local client that the DM has been deleted. DMs may occasionally "blink" back into view in the channel list, but they should immediately disappear. 
