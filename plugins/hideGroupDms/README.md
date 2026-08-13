@@ -1,4 +1,6 @@
-# Hide Group DMs
+**Hide Group DMs**
+
+
 Plugin that hides group DMs of your choosing from your channel list.
 
 Allows you to hide a group DM from view without having to leave it, with no indication to the other members of the chat.
