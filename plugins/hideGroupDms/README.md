@@ -8,4 +8,4 @@ Allows you to hide group DMs from view without having to leave it, with no indic
 
 DMs will not appear again on a new message; they will stay hidden until you unhide it.
 
-Works by lying to the local client that the DM has been deleted. DMs may occasionally "blink" back into view in the channel list, but they should immediately disappear. 
+Works by intermittently lying to the local client that the DM has been deleted. DMs may occasionally "blink" back into view in the channel list, but they should immediately disappear. 
